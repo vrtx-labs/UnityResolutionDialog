@@ -25,7 +25,9 @@ namespace NewResolutionDialog.Scripts.Controller
         static readonly string prefsKey_VSyncCount = "NewResolutionDialog_vSyncCount";
 
         Dictionary<string, List<string>> refreshRates = new Dictionary<string, List<string>>();
+        private List<DisplayInfo> displayInfos = new List<DisplayInfo>();
         bool updatingDialog = true;
+        bool movingToDisplay = false;
         #endregion
 
         #region Dialog Getters
@@ -198,26 +200,54 @@ namespace NewResolutionDialog.Scripts.Controller
             quality.AddOptions(options);
         }
 
-        void PopulateMonitorDropdown()
+
+
+        private void PopulateMonitorDropdown()
         {
+            Screen.GetDisplayLayout(displayInfos);
+
             display.ClearOptions();
-            var options = new List<Dropdown.OptionData>();
+            var displayOptions = new List<Dropdown.OptionData>();
+            //MoveOptionsToCache(displayOptions);
 
-            Dropdown.OptionData currentOption = null;
-            for (int i = 0; i < Display.displays.Length; i++)
+            if (displayInfos.Count == 0)
             {
-                var display = Display.displays[i];
-
-                var displayString = "Display " + (i + 1) + " (" + GetResolutionString(display.systemWidth, display.systemHeight) + ")";
-                var option = new Dropdown.OptionData(displayString);
-                options.Add(option);
-
-                // select active display
-                if (display.active)
-                    currentOption = option;
+                var currentResolution = Screen.currentResolution;
+                var fakeDisplay = new DisplayInfo() { name = "Fake display" };
+                fakeDisplay.width = currentResolution.width;
+                fakeDisplay.height = currentResolution.height;
+                fakeDisplay.workArea = new RectInt(0, 0, currentResolution.width, currentResolution.height);
+                fakeDisplay.refreshRate.denominator = 1;
+                displayInfos.Add(fakeDisplay);
             }
 
-            display.AddOptions(options);
+            var currentWindowPosition = Screen.mainWindowPosition;
+            var currentDisplay = Screen.mainWindowDisplayInfo;
+            int currentDisplayIndex = 0;
+
+
+
+            for (int i = 0; i < displayInfos.Count; i++)
+            {
+                var display = displayInfos[i];
+
+                var displayString = "Display " + (i + 1) + display.name + " " + display.width + "x" + display.height;
+                var option = new Dropdown.OptionData(displayString);
+                displayOptions.Add(option);
+                this.display.options.Add(option);
+
+                if (display.Equals(currentDisplay))
+                    currentDisplayIndex = i;
+            }
+
+            //m_CurrentDisplayInfo.text = GetCachedDisplayText(currentDisplay);
+            display.SetValueWithoutNotify(currentDisplayIndex);
+
+            //if (m_LastWindowPosition != currentWindowPosition)
+            //{
+            //    m_LastWindowPosition = currentWindowPosition;
+            //    m_MainWindowPosition.text = $"Main Window Position: [{currentWindowPosition.x}; {currentWindowPosition.y}]";
+            //}
         }
         #endregion
 
@@ -389,8 +419,7 @@ namespace NewResolutionDialog.Scripts.Controller
                 var height = int.Parse(resolution[1]);
                 var screenWidth = Display.main.systemWidth;
                 var screenHeight = Display.main.systemHeight;
-                //Debug.LogError("cur w/h: " + width + "x" + height + ", max w/h: " + screenWidth + "x" + screenHeight + ", Scr w/h: " + Screen.width + "x" + Screen.height + 
-                //    ", DspR w/h: " + Display.main.renderingWidth + "x" + Display.main.renderingHeight + ", DspS w/h: " + Display.main.systemWidth + "x" + Display.main.systemHeight);
+
 
                 if (width >= screenWidth || height >= screenHeight)
                 {
@@ -455,12 +484,11 @@ namespace NewResolutionDialog.Scripts.Controller
             if (updatingDialog)
                 return;
 
-            // currently does not attempt to auto-restart application, it merely removes the Play button (via Inspector events) thus forcing user to restart
-            // for one, restarting would have to be coded separately for each platform
-            // secondly, "ForceSingleInstance" would prevent a clean restart from within the running app (ie requires external app or batch file to control restart)
             displayNote.gameObject.SetActive(false);
 
-            UpdateDialogAfterEndOfFrame();
+            // PB: Implemented display change method possible since Unity 2021.2
+            StartCoroutine(MoveToDisplay(display.value));
+
         }
         #endregion
 
@@ -508,6 +536,38 @@ namespace NewResolutionDialog.Scripts.Controller
             PopulateDropdowns();
             ApplyCurrentSettingsToDialog();
             UpdateDialogInteractability();
+        }
+        #endregion
+
+        #region Move To Display
+        private IEnumerator MoveToDisplay(int index)
+        {
+            movingToDisplay = true;
+
+            try
+            {
+                var display = displayInfos[index];
+
+                Debug.Log($"Moving window to {display.name}");
+
+                Vector2Int targetCoordinates = new Vector2Int(0, 0);
+                if (Screen.fullScreenMode != FullScreenMode.Windowed)
+                {
+                    // Target the center of the display. Doing it this way shows off
+                    // that MoveMainWindow snaps the window to the top left corner
+                    // of the display when running in fullscreen mode.
+                    targetCoordinates.x += display.width / 2;
+                    targetCoordinates.y += display.height / 2;
+                }
+
+                var moveOperation = Screen.MoveMainWindowTo(display, targetCoordinates);
+                yield return moveOperation;
+            }
+            finally
+            {
+                UpdateDialogAfterEndOfFrame();
+                movingToDisplay = false;
+            }
         }
         #endregion
     }
