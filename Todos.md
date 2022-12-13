@@ -40,10 +40,10 @@ Changes to the following items may cause other items to change or become irrelev
 TODO
 
 Tasks:
-- popup funktion (play = ok)
-- popup key einstellbar
+- Add event listeners trough code instead of inspector
+- Replace all "Text" objects with TMPro
+- Chore: Code cleanup
+
 
 Bugs:
 
-Idee:
-- Tool, das ausgibt welche Resolution was ist (Display, Screen, Window, Desktop, usw.)

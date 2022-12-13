@@ -18,7 +18,6 @@ namespace NewResolutionDialog.Scripts.Controller
         [SerializeField] Text vSyncNote;
         [SerializeField] Dropdown quality;
         [SerializeField] Dropdown display;
-        [SerializeField] Text displayNote;
 
         static readonly string hzSuffix = " Hz";
         static readonly string prefsKey_RefreshRate = "NewResolutionDialog_RefreshRate";
@@ -84,7 +83,6 @@ namespace NewResolutionDialog.Scripts.Controller
         #region Unity Startup
         void Awake()
         {
-            displayNote.gameObject.SetActive(false);
             vSyncNote.gameObject.SetActive(false);
 
             var hz = PlayerPrefs.GetInt(prefsKey_RefreshRate, 0);
@@ -201,27 +199,29 @@ namespace NewResolutionDialog.Scripts.Controller
         }
 
 
-
+        /// <summary>
+        /// Populate the display dropdown and select the currently active display
+        /// </summary>
         private void PopulateMonitorDropdown()
         {
             Screen.GetDisplayLayout(displayInfos);
 
             display.ClearOptions();
-            var displayOptions = new List<Dropdown.OptionData>();
-            //MoveOptionsToCache(displayOptions);
 
             if (displayInfos.Count == 0)
             {
                 var currentResolution = Screen.currentResolution;
-                var fakeDisplay = new DisplayInfo() { name = "Fake display" };
-                fakeDisplay.width = currentResolution.width;
-                fakeDisplay.height = currentResolution.height;
-                fakeDisplay.workArea = new RectInt(0, 0, currentResolution.width, currentResolution.height);
+                var fakeDisplay = new DisplayInfo
+                {
+                    name = "Fake display",
+                    width = currentResolution.width,
+                    height = currentResolution.height,
+                    workArea = new RectInt(0, 0, currentResolution.width, currentResolution.height)
+                };
                 fakeDisplay.refreshRate.denominator = 1;
                 displayInfos.Add(fakeDisplay);
             }
 
-            var currentWindowPosition = Screen.mainWindowPosition;
             var currentDisplay = Screen.mainWindowDisplayInfo;
             int currentDisplayIndex = 0;
 
@@ -229,25 +229,18 @@ namespace NewResolutionDialog.Scripts.Controller
 
             for (int i = 0; i < displayInfos.Count; i++)
             {
-                var display = displayInfos[i];
+                var displayInfo = displayInfos[i];
 
-                var displayString = "Display " + (i + 1) + display.name + " " + display.width + "x" + display.height;
+                var displayString = "" + (i + 1) + ": " +  displayInfo.name + " " + displayInfo.width + "x" + displayInfo.height;
                 var option = new Dropdown.OptionData(displayString);
-                displayOptions.Add(option);
                 this.display.options.Add(option);
 
-                if (display.Equals(currentDisplay))
+                if (displayInfo.Equals(currentDisplay))
                     currentDisplayIndex = i;
             }
 
-            //m_CurrentDisplayInfo.text = GetCachedDisplayText(currentDisplay);
             display.SetValueWithoutNotify(currentDisplayIndex);
-
-            //if (m_LastWindowPosition != currentWindowPosition)
-            //{
-            //    m_LastWindowPosition = currentWindowPosition;
-            //    m_MainWindowPosition.text = $"Main Window Position: [{currentWindowPosition.x}; {currentWindowPosition.y}]";
-            //}
+            display.RefreshShownValue();
         }
         #endregion
 
@@ -261,7 +254,6 @@ namespace NewResolutionDialog.Scripts.Controller
             SelectCurrentFullScreenModeDropdownItem();
             SelectCurrentVSyncCountDropdownItem();
             SelectCurrentQualityLevelDropdownItem();
-            SelectCurrentDisplayDropdownItem();
 
             updatingDialog = false;
         }
@@ -326,18 +318,6 @@ namespace NewResolutionDialog.Scripts.Controller
         void SelectCurrentQualityLevelDropdownItem()
         {
             quality.value = QualitySettings.GetQualityLevel();
-        }
-        void SelectCurrentDisplayDropdownItem()
-        {
-            // take the first active display
-            for (int i = 0; i < Display.displays.Length; i++)
-            {
-                if (Display.displays[i].active)
-                {
-                    display.value = i;
-                    break;
-                }
-            }
         }
         #endregion
 
@@ -479,15 +459,13 @@ namespace NewResolutionDialog.Scripts.Controller
             UpdateDialogAfterEndOfFrame();
         }
 
-        public void OnMonitorChanged()
+        public void OnMonitorChanged(int index)
         {
             if (updatingDialog)
                 return;
 
-            displayNote.gameObject.SetActive(false);
-
             // PB: Implemented display change method possible since Unity 2021.2
-            StartCoroutine(MoveToDisplay(display.value));
+            StartCoroutine(MoveToDisplay(index));
 
         }
         #endregion
@@ -548,7 +526,7 @@ namespace NewResolutionDialog.Scripts.Controller
             {
                 var display = displayInfos[index];
 
-                Debug.Log($"Moving window to {display.name}");
+                Debug.Log($"Moving window to display{index}: {display.name}");
 
                 Vector2Int targetCoordinates = new Vector2Int(0, 0);
                 if (Screen.fullScreenMode != FullScreenMode.Windowed)
