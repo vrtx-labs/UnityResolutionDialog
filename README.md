@@ -11,8 +11,11 @@ Add this dependency to your ``manifest.json`` located at ``/Packages/manifest.js
     ...
     "dependencies": {
         ...
-        "com.sitterheim.unityresolutiondialog": "https://github.com/sitterheim/UnityResolutionDialog.git#release/stable"
+        "com.vrtxlabs.unityresolutiondialog": "https://github.com/vrtx-labs/UnityResolutionDialog#release/stable.git#release/stable"
     }
     ...
 }
 ```
+
+# VRTX Fork
+This fork provides some small fixes.
